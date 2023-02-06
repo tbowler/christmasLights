@@ -16,7 +16,7 @@ import { Box,
   Grid } from '@mui/material';
 import Logout from '@mui/icons-material/Logout';
 import HouseIcon from '@mui/icons-material/House';
-import { ref, set } from "firebase/database";
+import { ref, set, get, update } from "firebase/database";
 import _ from "lodash";
 
 export default function AccountMenu({user, auth, db, houseAdded}) {
@@ -37,9 +37,36 @@ export default function AccountMenu({user, auth, db, houseAdded}) {
   const [address, setAddress] = React.useState('');
   const [addressError, setAddressError] = React.useState('');
   const [city, setCity] = React.useState('Alexandria');
-  const [state] = React.useState('AL');
+  const [state, setState] = React.useState('AL');
   const [zip, setZip] = React.useState('36250');
+  const [photo, setPhoto] = React.useState('');
+  const [allowUpdate, setAllowUpdate] = React.useState(false);
   
+  get(ref(db, `places/${user.uid.toString()}`)).then((snapshot) => {
+    if (snapshot.val() !== null) {
+      const data = snapshot.val();
+      if (!allowUpdate && data.address !== address) {
+        setAddress(data.address);
+      }
+      if (!allowUpdate && data.city !== city) {
+        setCity(data.city);
+      }
+      if (!allowUpdate && data.state !== state) {
+        setState(data.state);
+      }
+      if (!allowUpdate && data.zip !== zip) {
+        setZip(data.zip);
+      }
+      if (!allowUpdate && data.photo !== photo) {
+        setPhoto(data.photo);
+      }
+      if (allowUpdate !== true) {
+        setAllowUpdate(true);
+      }
+    }
+  });
+
+
   const onAddHouse = async() => {
     const addressData = _.replace(`${address}, ${city} ${state} ${zip}`, ' ', '+');
     const res = await (await fetch(
@@ -51,13 +78,32 @@ export default function AccountMenu({user, auth, db, houseAdded}) {
       return;
     }
     const location = _.get(res, 'results[0].geometry.location', {lat: '', lng: ''});
-    set(ref(db, `places/${user.uid.toString()}`), {
-      name: `${address}, ${city} ${state} ${zip}`,
-      latitude: location.lat,
-      longitude: location.lng,
-      addedBy: user.uid,
-    });
-    set(ref(db, `users/${user.uid.toString()}/houseAdded`), true);
+    if (allowUpdate) {
+      update(ref(db, `places/${user.uid.toString()}`), {
+        name: `${address}, ${city} ${state} ${zip}`,
+        latitude: location.lat,
+        longitude: location.lng,
+        addedBy: user.uid,
+        photo,
+        address,
+        city,
+        state,
+        zip
+      });
+    } else {
+      set(ref(db, `places/${user.uid.toString()}`), {
+        name: `${address}, ${city} ${state} ${zip}`,
+        latitude: location.lat,
+        longitude: location.lng,
+        addedBy: user.uid,
+        photo,
+        address,
+        city,
+        state,
+        zip
+      });
+      set(ref(db, `users/${user.uid.toString()}/houseAdded`), true);
+    }
     handleCloseAddHouse();
   }
 
@@ -113,18 +159,12 @@ export default function AccountMenu({user, auth, db, houseAdded}) {
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
       >
-        <MenuItem onClick={() => setOpenAddHouse(true)}
-          disabled={houseAdded}
-        >
-          <Avatar><HouseIcon /></Avatar> Add My House
+        <MenuItem onClick={() => setOpenAddHouse(true)}>
+          <Avatar><HouseIcon /></Avatar>
+            {houseAdded && (<>Edit</>)}
+            {!houseAdded && (<>Add</>)} My House
         </MenuItem>
         <Divider />
-        {/* <MenuItem>
-          <ListItemIcon>
-            <Settings fontSize="small" />
-          </ListItemIcon>
-          Settings
-        </MenuItem> */}
         <MenuItem onClick={() => auth.signOut()}>
           <ListItemIcon>
             <Logout />
@@ -168,11 +208,18 @@ export default function AccountMenu({user, auth, db, houseAdded}) {
                 }
               }} value={zip} label="Zip" variant="standard" disabled />
             </Grid>
+            <Grid item xs={12}>
+              <TextField fullWidth id="standard-basic" value={photo} label="Photo Url (Optional)" variant="standard" onChange={(e) => {
+                setPhoto(e.target.value);
+              }}  />
+            </Grid>
           </Grid>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseAddHouse}>Cancel</Button>
-          <Button disabled={_.isEmpty(address)} onClick={onAddHouse}>Add</Button>
+          <Button disabled={_.isEmpty(address)} onClick={onAddHouse}>
+            {_.isEmpty(address) ? `Add` : `Update`}
+          </Button>
         </DialogActions>
       </Dialog>
     </React.Fragment>

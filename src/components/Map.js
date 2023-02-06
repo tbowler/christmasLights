@@ -1,5 +1,5 @@
 import React, {Component} from 'react'
-import { ref, get, set, onValue} from "firebase/database";
+import { ref, set, onValue} from "firebase/database";
 import { Map, GoogleApiWrapper, Marker } from 'google-maps-react'
 import mapStyles from '../styles/mapStyles'
 import _ from 'lodash';
@@ -10,8 +10,10 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
-  Slide
+  Slide,
+  Grid
 } from '@mui/material';
+import { v4 as uuidv4 } from 'uuid';
 
 const Transition = React.forwardRef(function Transition(props, ref) {
   return <Slide direction="up" ref={ref} {...props} />;
@@ -20,10 +22,10 @@ const Transition = React.forwardRef(function Transition(props, ref) {
 class MapContainer extends Component{
   state = {
     myMarkers: [],
-    showingInfoWindow: false,
     activeMarker: {},
     selectedPlace: {},
     openMarkerDialog: false,
+    allowVote: true,
   }
 
   _mapLoaded(mapProps, map) {
@@ -51,27 +53,23 @@ class MapContainer extends Component{
         key={`marker-key-${key}`}
         name={mark.name}
         id={key}
-        label={{text: voteCount.toString(), color: 'white', style:{fontWeight: 'bold'}}}
+        label={{text: voteCount.toString(), color: 'white', fontSize: '18px', fontWeight: 'bold'}}
         position={{
           lat: mark.latitude,
           lng: mark.longitude
         }}
+        photo={_.get(mark, 'photo', null)}
         onClick={(props, marker, e) => {
           if (user) {
-            // check to see if the user has already voted
-            get(ref(this.props.db, `places/${this.state.activeMarker.id}/votes/${this.props.user.uid}`)).then((snapshot) => {
-              if (snapshot.val() === null) {
-                this.setState({
-                  selectedPlace: props,
-                  activeMarker: marker,
-                  openMarkerDialog: true
-                });
-              }
+            this.setState({
+              selectedPlace: props,
+              activeMarker: marker,
+              openMarkerDialog: true,
             });
           }
         }}
         icon={{
-          url: "/icons/christmas_marker_base_red_tree_small.png",
+          url: "/icons/green_circle.png",
           // anchor: new this.props.google.maps.Point(32,32),
           // scaledSize: new this.props.google.maps.Size(64,64)
         }}
@@ -80,10 +78,10 @@ class MapContainer extends Component{
   }
 
   onMapClicked = (props) => {
-    if (this.state.showingInfoWindow) {
+    if (this.state.openMarkerDialog) {
       this.setState({
-        showingInfoWindow: false,
-        activeMarker: null
+        openMarkerDialog: false,
+        activeMarker: null,
       })
     }
   };
@@ -95,9 +93,8 @@ class MapContainer extends Component{
   }
 
   voteYes = () => {
-    set(ref(this.props.db, `places/${this.state.activeMarker.id}/votes/${this.props.user.uid}`), new Date().toISOString());
-    console.log(`users/${this.props.user.uid}/votesRemaining`);
-    set(ref(this.props.db, `users/${this.props.user.uid}/votesRemaining`), (this.props.votesRemaining - 1));
+    const uid = uuidv4();
+    set(ref(this.props.db, `places/${this.state.activeMarker.id}/votes/${uid}`), new Date().toISOString());
     this.handleClose();
   }
 
@@ -107,7 +104,8 @@ class MapContainer extends Component{
         style={{
           position: "relative",
           width: "100%",
-          height: "100vh"}}
+          height: "100vh"
+        }}
         className="map"
       >
         <Map
@@ -134,6 +132,13 @@ class MapContainer extends Component{
             <DialogContentText id="alert-dialog-slide-description">
               Does this location have the best Christmas display?
             </DialogContentText>
+            {_.get(this.state, 'activeMarker.photo', null) && (
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <img style={{width: '100%'}} alt={`${_.get(this.state, 'activeMarker.name')}`} src={_.get(this.state, 'activeMarker.photo', null)} />
+                </Grid>
+              </Grid>
+            )}
           </DialogContent>
           <DialogActions>
             <Button onClick={this.handleClose}>No</Button>
@@ -146,5 +151,5 @@ class MapContainer extends Component{
 }
 
 export default GoogleApiWrapper({
-  apiKey: 'AIzaSyCrRfQlu6G33fK4K6IW0QjIpQw1Rpbs6bg'
+  apiKey: process.env.REACT_APP_GOOGLE_MAP_API_KEY
 })(MapContainer)

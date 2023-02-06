@@ -7,7 +7,7 @@ export default function ButtonAppBar({signInWithGoogle, auth, user, name, votesR
       <AppBar position="static" style={{backgroundColor: 'red'}}>
         <Toolbar>
           <Typography component="div">
-            Votes Remaining: {votesRemaining}
+
           </Typography>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             {name}
@@ -17,7 +17,6 @@ export default function ButtonAppBar({signInWithGoogle, auth, user, name, votesR
           )}
           {user && (
             <AccountMenu user={user} auth={auth} db={db} houseAdded={houseAdded} />
-            // <Button color="inherit" onClick={() => auth.signOut()}>Logout</Button>
           )}
         </Toolbar>
       </AppBar>
